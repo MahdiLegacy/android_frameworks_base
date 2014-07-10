@@ -21,7 +21,6 @@ import android.net.LocalSocket;
 import android.net.LocalSocketAddress;
 import android.os.Handler;
 import android.os.Looper;
-import android.text.TextUtils;
 import android.util.Slog;
 import android.util.SparseArray;
 
@@ -190,6 +189,11 @@ public final class Installer {
 
 
     private String transaction(String cmd) {
+        if (!connect()) {
+            Slog.e(TAG, "connection failed");
+            return "-1";
+        }
+
         int transactionId;
         synchronized (mTransactionIdLock) {
             transactionId = mLastTransactionId++;
@@ -204,11 +208,6 @@ public final class Installer {
                 while(mResponses.get(transactionId) == null) {
                     synchronized (mPendingRequests) {
                         if (!mPendingRequests.contains(transactionId)) {
-                            if (!connect()) {
-                                Slog.e(TAG, "connection failed");
-                                return "-1";
-                            }
-
                             if (!writeCommand(cmd, transactionId)) {
                                 /*
                                  * If installd died and restarted in the background (unlikely but
@@ -343,59 +342,6 @@ public final class Installer {
         return execute(builder.toString());
     }
 
-    public int idmap(String targetApkPath, String overlayApkPath, String redirectionsPath, int uid,
-                     int targetHash, int overlayHash) {
-        StringBuilder builder = new StringBuilder();
-        if (TextUtils.isEmpty(redirectionsPath)) {
-            builder.append("idmap");
-        } else {
-            builder.append("idmap_with_redirs");
-        }
-        builder.append(' ');
-        builder.append(targetApkPath);
-        builder.append(' ');
-        builder.append(overlayApkPath);
-        builder.append(' ');
-        builder.append(uid);
-        builder.append(' ');
-        builder.append(targetHash);
-        builder.append(' ');
-        builder.append(overlayHash);
-        if (!TextUtils.isEmpty(redirectionsPath)) {
-            builder.append(' ');
-            builder.append(redirectionsPath);
-        }
-        return execute(builder.toString());
-    }
-
-    public int aapt(String themeApkPath, String internalPath, String resTablePath, int uid,
-                    int pkgId, String commonResourcesPath) {
-
-        StringBuilder builder = new StringBuilder();
-        if (TextUtils.isEmpty(commonResourcesPath)) {
-            builder.append("aapt");
-        } else {
-            builder.append("aapt_with_common");
-        }
-        builder.append(' ');
-        builder.append(themeApkPath);
-        builder.append(' ');
-        builder.append(internalPath);
-        builder.append(' ');
-        builder.append(resTablePath);
-        builder.append(' ');
-        builder.append(uid);
-        builder.append(' ');
-        builder.append(pkgId);
-
-        if (!TextUtils.isEmpty(commonResourcesPath)) {
-            builder.append(' ');
-            builder.append(commonResourcesPath);
-        }
-
-        return execute(builder.toString());
-    }
-
     public int movedex(String srcPath, String dstPath) {
         StringBuilder builder = new StringBuilder("movedex");
         builder.append(' ');
@@ -450,7 +396,7 @@ public final class Installer {
         return execute(builder.toString());
     }
 
-    public int createUserData(String name, int uid, int userId, String seinfo) {
+    public int createUserData(String name, int uid, int userId) {
         StringBuilder builder = new StringBuilder("mkuserdata");
         builder.append(' ');
         builder.append(name);
@@ -458,8 +404,6 @@ public final class Installer {
         builder.append(uid);
         builder.append(' ');
         builder.append(userId);
-        builder.append(' ');
-        builder.append(seinfo != null ? seinfo : "!");
         return execute(builder.toString());
     }
 
@@ -556,9 +500,5 @@ public final class Installer {
         builder.append(userId);
 
         return execute(builder.toString());
-    }
-
-    public boolean restoreconData() {
-        return (execute("restorecondata") == 0);
     }
 }
